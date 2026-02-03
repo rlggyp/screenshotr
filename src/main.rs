@@ -31,7 +31,7 @@ async fn main() -> Result<(), Error> {
         .nest_service("/screenshotr/images", tower_http::services::ServeDir::new("assets/screenshots"))
         .with_state(app_state.clone());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:10000").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:12009").await?;
     log::info!("Listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app).await?;
