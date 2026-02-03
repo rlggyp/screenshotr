@@ -20,19 +20,30 @@ pub async fn screenshot(
 
     let payload = match result {
         Err(e) => {
-            return (StatusCode::BAD_REQUEST, format!("Error parse: {e:#?}")).into_response();
+            log::error!("Invalid request body: {e:#?}");
+            return (StatusCode::BAD_REQUEST, "Invalid request body".to_string()).into_response();
         },
         Ok(payload) => payload,
     };
 
     match app_state.screenshot.take_screenshot(&payload.url).await {
-        Ok(filepath) => (
-            StatusCode::OK,
-            format!(r#"{{"status":"ok","filepath":"{}"}}"#, filepath)
-        ).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!(r#"{{"status":"error","message":"{}"}}"#, e)
-        ).into_response(),
+        Ok(image_url) => {
+            let response_json = serde_json::json!({
+                "image_url": image_url,
+            });
+
+            let response = serde_json::to_string(&response_json).unwrap_or_default();
+
+           (StatusCode::OK, response).into_response()
+        },
+        Err(e) => {
+            let response_json = serde_json::json!({
+                "message": e.to_string(),
+            });
+
+            let response = serde_json::to_string(&response_json).unwrap_or_default();
+
+           (StatusCode::INTERNAL_SERVER_ERROR, response).into_response()
+        }
     }
 }
