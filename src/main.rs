@@ -1,18 +1,15 @@
 mod auth;
 mod app_state;
 mod config;
+mod screenshotr;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
-use crate::app_state::AppState;
+use crate::{app_state::AppState, screenshotr::handler::screenshot};
 
 use std::sync::Arc;
 
-use axum::{
-    response::IntoResponse, routing,
-    extract::Json,
-    middleware,
-};
+use axum::{middleware, routing};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -23,15 +20,16 @@ async fn main() -> Result<(), Error> {
         .expect("Failed to init log4rs");
 
     let config = config::Config::get_config()?;
-    let app_state = Arc::new(AppState::new(config));
+    let app_state = Arc::new(AppState::new(config.clone())?);
 
     let app = axum::Router::new()
         .route("/api/screenshotr",
-            routing::post(screenshot_handler)
+            routing::post(screenshot)
                 .layer(middleware::from_fn_with_state(app_state.clone(), auth::middleware::hmac_middleware))
                 .layer(middleware::from_fn_with_state(app_state.clone(), auth::middleware::basic_auth_middleware))
         )
-        .nest_service("/screenshotr/images", tower_http::services::ServeDir::new("assets/images"));
+        .nest_service("/screenshotr/images", tower_http::services::ServeDir::new("assets/screenshots"))
+        .with_state(app_state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:10000").await?;
     log::info!("Listening on {}", listener.local_addr().unwrap());
@@ -39,11 +37,4 @@ async fn main() -> Result<(), Error> {
     axum::serve(listener, app).await?;
 
     Ok(())
-}
-
-async fn screenshot_handler(
-    Json(body): Json<serde_json::Value>,
-) -> impl IntoResponse {
-    log::info!("{body:#?}");
-    ().into_response()
 }

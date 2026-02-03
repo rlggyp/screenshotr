@@ -18,7 +18,8 @@ pub struct BasicAuth {
 }
 
 impl BasicAuth {
-    pub fn new(credentials: HashMap<String, String>) -> Self {
+    pub fn new(credentials: &HashMap<String, String>) -> Self {
+        let credentials = credentials.clone();
         let auth_header_cache: Arc<RwLock<Vec::<String>>> = Arc::new(RwLock::new(Vec::new()));
 
         Self { credentials, auth_header_cache }

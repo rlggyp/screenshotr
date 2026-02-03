@@ -2,10 +2,18 @@ use crate::Error;
 
 use std::collections::HashMap;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ScreenshotConfig {
+    pub webdriver_url: String,
+    pub webdriver_capabilities: serde_json::Map<String, serde_json::Value>,
+    pub page_load_delay_secs: u64,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Config {
     pub hmac_secret: String,
     pub basic_auth_users: HashMap<String, String>,
+    pub screenshot: ScreenshotConfig,
 }
 
 impl Config {

@@ -10,6 +10,8 @@ use axum::{
   body::{Body, to_bytes}
 };
 
+const MAX_PAYLOAD_BODY_SIZE: usize = 256 * 1024;
+
 pub async fn basic_auth_middleware(
     State(state): State<Arc<AppState>>,
     request: Request,
@@ -71,7 +73,7 @@ pub async fn hmac_middleware(
 
     let (parts, body) = request.into_parts();
 
-    let body = match to_bytes(body, 10).await {
+    let body = match to_bytes(body, MAX_PAYLOAD_BODY_SIZE).await {
         Ok(b) => b,
         Err(_) => return Err(StatusCode::UNAUTHORIZED),
     };
