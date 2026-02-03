@@ -8,6 +8,7 @@ pub struct Screenshot {
     webdriver_url: String,
     webdriver_capabilities: serde_json::Map<String, serde_json::Value>,
     page_load_delay_secs: u64,
+    public_base_url: String,
 }
 
 impl Screenshot {
@@ -15,9 +16,10 @@ impl Screenshot {
         std::fs::create_dir_all("assets/screenshots")?;
 
         let screenshot = Self {
+            page_load_delay_secs: config.page_load_delay_secs,
+            public_base_url: config.public_base_url.clone(),
             webdriver_url: config.webdriver_url.clone(),
             webdriver_capabilities: config.webdriver_capabilities.clone(),
-            page_load_delay_secs: config.page_load_delay_secs,
         };
 
         Ok(screenshot)
@@ -32,16 +34,37 @@ impl Screenshot {
             .connect(&self.webdriver_url)
             .await?;
 
-        client.goto(url).await?;
+        if let Err(e) = client.goto(url).await {
+            log::error!("Failed go to url: {url} {e}");
+            client.close().await.ok();
+            return Err(e.into());
+        }
+
         self.wait_page_load_delay().await;
         self.undock_menu(&client).await;
 
-        let png_data = client.screenshot().await?;
+        let png_data = match client.screenshot().await {
+            Ok(d) => d,
+            Err(e) => {
+                log::error!("Failed screenshot web page: {url} {e}");
+                client.close().await.ok();
+                return Err(e.into());
+            }
+        };
 
         let filename = format!("{}.png", Uuid::new_v4());
         let filepath = format!("assets/screenshots/{}", filename);
-        std::fs::write(&filepath, &png_data)?;
-        let image_url = format!("screenshotr/images/{}", filename);
+
+        if let Err(e) = tokio::fs::write(&filepath, &png_data).await {
+            log::error!("Failed to write screenshot file: {e}");
+            client.close().await.ok();
+            return Err(e.into());
+        }
+
+        log::info!("Screenshot saved: {}", filepath);
+
+        let image_path = format!("/screenshotr/images/{}", filename);
+        let image_url = format!("{}{}", self.public_base_url.trim_end_matches('/'), image_path);
 
         client.close().await.ok();
 
@@ -57,13 +80,13 @@ impl Screenshot {
             Ok(element) => {
                 log::debug!("Dock menu button found, attempting to click.");
                 if let Err(e) = element.click().await {
-                    log::error!("Failed to click dock menu button: {}", e);
+                    log::debug!("Failed to click dock menu button: {}", e);
                 } else {
                     log::debug!("Successfully clicked dock menu button.");
                 }
             },
             Err(e) => {
-                log::error!("Dock menu button not found: {}", e);
+                log::debug!("Dock menu button not found: {}", e);
             },
         };
     }

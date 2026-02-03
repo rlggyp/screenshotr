@@ -4,9 +4,10 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct ScreenshotConfig {
+    pub page_load_delay_secs: u64,
+    pub public_base_url: String,
     pub webdriver_url: String,
     pub webdriver_capabilities: serde_json::Map<String, serde_json::Value>,
-    pub page_load_delay_secs: u64,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]

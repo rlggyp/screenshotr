@@ -20,7 +20,7 @@ async fn main() -> Result<(), Error> {
         .expect("Failed to init log4rs");
 
     let config = config::Config::get_config()?;
-    let app_state = Arc::new(AppState::new(config.clone())?);
+    let app_state = Arc::new(AppState::new(config)?);
 
     let app = axum::Router::new()
         .route("/api/screenshotr",
