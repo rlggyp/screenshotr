@@ -4,17 +4,75 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct ScreenshotConfig {
+    #[serde(default = "ScreenshotConfig::default_page_load_delay_secs")]
     pub page_load_delay_secs: u64,
+    #[serde(default = "ScreenshotConfig::default_screenshots_dir")]
+    pub screenshots_dir: String,
+    #[serde(default = "ScreenshotConfig::default_public_base_url")]
     pub public_base_url: String,
+    #[serde(default = "ScreenshotConfig::default_webdriver_url")]
     pub webdriver_url: String,
+    #[serde(default = "ScreenshotConfig::default_webdriver_capabilities")]
     pub webdriver_capabilities: serde_json::Map<String, serde_json::Value>,
 }
+
+impl ScreenshotConfig {
+    fn default_page_load_delay_secs() -> u64 {
+        2
+    }
+
+    fn default_screenshots_dir() -> String {
+        String::from("/assets/screenshots")
+    }
+
+    fn default_public_base_url() -> String {
+        String::from("http://127.0.0.1:12009")
+    }
+
+    fn default_webdriver_url() -> String {
+        String::from("http://127.0.0.1:4444")
+    }
+
+    fn default_webdriver_capabilities() -> serde_json::Map<String, serde_json::Value> {
+        let capabilities = serde_json::json!({
+            "browserName": "chrome",
+            "goog:chromeOptions": {
+              "args": [
+                "--headless=new",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--window-size=1920,1200"
+              ]
+            }
+        });
+
+        let mut map = serde_json::Map::new();
+        map.insert("capabilities".into(), capabilities);
+        map
+    }
+
+    fn normalize(&mut self) {
+        self.screenshots_dir = self.screenshots_dir
+            .trim_end_matches('/')
+            .to_string();
+
+        self.public_base_url = self.public_base_url
+            .trim_end_matches('/')
+            .to_string();
+
+        self.webdriver_url = self.webdriver_url
+            .trim_end_matches('/')
+            .to_string();
+    }
+} 
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Config {
     pub hmac_secret: String,
     pub basic_auth_users: HashMap<String, String>,
     pub screenshot: ScreenshotConfig,
+    pub allowed_domains: Vec<String>,
 }
 
 impl Config {
@@ -32,9 +90,10 @@ impl Config {
                 e
             })?;
 
-        let config: Config = serde_yaml::from_reader(file)?;
+        let mut config: Config = serde_yaml::from_reader(file)?;
 
         config.validate()?;
+        config.screenshot.normalize();
 
         Ok(config)
     }
