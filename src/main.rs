@@ -10,6 +10,7 @@ use crate::{app_state::AppState, screenshotr::handler::screenshot};
 use std::sync::Arc;
 
 use axum::{middleware, routing};
+use tokio::signal::unix::{signal, SignalKind};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -34,7 +35,23 @@ async fn main() -> Result<(), Error> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:12009").await?;
     log::info!("Listening on {}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let mut sigint = signal(SignalKind::interrupt()).expect("failed to bind SIGINT handler");
+    let mut sigterm = signal(SignalKind::terminate()).expect("failed to bind SIGTERM handler");
+
+    tokio::select! {
+        _ = sigint.recv() => {
+            log::info!("SIGINT received, Gracefully shutting down.");
+        }
+        _ = sigterm.recv() => {
+            log::info!("SIGTERM received, Gracefully shutting down.");
+        }
+    }
 }

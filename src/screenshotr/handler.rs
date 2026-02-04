@@ -26,6 +26,10 @@ pub async fn screenshot(
         Ok(payload) => payload,
     };
 
+    if !is_allowed_domains(&payload.url, &app_state.allowed_domains) {
+        return (StatusCode::FORBIDDEN, "URL not allowed".to_string()).into_response();
+    }
+
     match app_state.screenshot.take_screenshot(&payload.url).await {
         Ok(image_url) => {
             let response_json = serde_json::json!({
@@ -46,4 +50,23 @@ pub async fn screenshot(
            (StatusCode::INTERNAL_SERVER_ERROR, response).into_response()
         }
     }
+}
+
+pub fn is_allowed_domains(url: &str, allowed_domains: &Vec<String>) -> bool {
+    let parsed = match url::Url::parse(url) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+
+    match parsed.scheme() {
+        "http" | "https" => {},
+        _ => return false,
+    }
+
+    let host = match parsed.host_str() {
+        Some(h) => h,
+        None => return false,
+    };
+
+    allowed_domains.iter().any(|d| host.ends_with(d))
 }
