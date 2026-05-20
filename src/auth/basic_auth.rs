@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use base64::{Engine, engine::general_purpose};
@@ -14,16 +14,27 @@ pub struct Credential {
 #[derive(Clone)]
 pub struct BasicAuth {
     pub credentials: HashMap<String, String>,
-    pub auth_header_cache: Arc<RwLock<Vec<String>>>,
+    pub hashed_credential_cache: Arc<RwLock<HashSet<String>>>,
+    pub cache_key: [u8; 32],
 }
 
 impl BasicAuth {
-    pub fn new(credentials: &HashMap<String, String>) -> Self {
-        let credentials = credentials.clone();
-        let auth_header_cache: Arc<RwLock<Vec::<String>>> = Arc::new(RwLock::new(Vec::new()));
-
-        Self { credentials, auth_header_cache }
+    pub fn new(credentials: HashMap<String, String>) -> Self {
+        let mut key = [0u8; 32];
+        getrandom::fill(&mut key).expect("Failed to generate random key");
+        
+        Self {
+            credentials,
+            hashed_credential_cache: Arc::new(RwLock::new(HashSet::new())),
+            cache_key: key,
+        }
     }
+    
+    pub fn hash_credential(key: &[u8; 32], credential: &str) -> String {
+        let hash = blake3::keyed_hash(key, credential.as_bytes());
+        hash.to_hex().to_string()
+    }
+
 
     pub fn is_valid_basic_auth_header(auth_header: &str) -> Option<Credential> {
         log::debug!(
@@ -81,14 +92,19 @@ impl BasicAuth {
             Some(hash) => {
                 let verified = bcrypt::verify(password, &hash).unwrap_or(false);
 
-                let mut cache = self.auth_header_cache.write().await;
-                if verified && !cache.contains(&credential.encoded) {
-                    cache.push(credential.encoded.clone());
+                if verified {
+                    let hashed_credential = BasicAuth::hash_credential(&self.cache_key, &credential.encoded);
+                    
+                    let is_cached = self.hashed_credential_cache.read().await.contains(&hashed_credential);
+                    if !is_cached {
+                        let mut cache = self.hashed_credential_cache.write().await;
+                        cache.insert(hashed_credential);
+                    }
                 }
 
                 log::debug!("Password verification for user {}: {}", username, verified);
                 verified
-            }
+            },
             None => {
                 log::debug!("User {} not found in credentials", username);
                 false

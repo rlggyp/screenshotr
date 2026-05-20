@@ -14,7 +14,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(config: Config) -> Result<Self, Error> {
         let hmac = Hmac::new(&config.hmac_secret);
-        let basic_auth = BasicAuth::new(&config.basic_auth_users);
+        let basic_auth = BasicAuth::new(config.basic_auth_users);
         let screenshot = Screenshot::new(&config.screenshot)?;
         let allowed_domains = config.allowed_domains;
 

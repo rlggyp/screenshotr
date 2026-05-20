@@ -38,7 +38,7 @@ impl ScreenshotConfig {
             "browserName": "chrome",
             "goog:chromeOptions": {
               "args": [
-                "--headless=new",
+                "--headless",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",

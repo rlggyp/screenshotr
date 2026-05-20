@@ -39,8 +39,10 @@ pub async fn basic_auth_middleware(
         };
 
         {
-            let cache = state.basic_auth.auth_header_cache.read().await;
-            if cache.contains(&credential.encoded) {
+            let hashed_credential = BasicAuth::hash_credential(&state.basic_auth.cache_key, &credential.encoded);
+            let is_cached = state.basic_auth.hashed_credential_cache.read().await.contains(&hashed_credential);
+
+            if is_cached {
                 log::debug!("[middleware][basic_auth] Authorization header found in cache, skipping further verification");
                 return Ok(next.run(request).await);
             }

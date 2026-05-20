@@ -14,7 +14,12 @@ pub struct Screenshot {
 
 impl Screenshot {
     pub fn new(config: &config::ScreenshotConfig) -> Result<Self, Error> {
-        std::fs::create_dir_all(&config.screenshots_dir)?;
+        std::fs::create_dir_all(&config.screenshots_dir)
+            .map_err(|e| {
+                log::error!("Failed to create directory '{}': {}", config.screenshots_dir, e);
+                e
+            })?;
+
         let public_base_url = config.public_base_url.clone()
             .trim_end_matches('/')
             .to_string();
@@ -37,7 +42,11 @@ impl Screenshot {
         let client = ClientBuilder::native()
             .capabilities(self.webdriver_capabilities.clone())
             .connect(&self.webdriver_url)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!("Failed to create Webdriver Client: {}", e);
+                e
+            })?;
 
         if let Err(e) = client.goto(url).await {
             log::error!("Failed go to url: {url} {e}");
