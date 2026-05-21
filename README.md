@@ -84,19 +84,25 @@ screenshot:
     browserName: chrome
     goog:chromeOptions:
       args:
-      - --headless=new
+      - --headless
       - --no-sandbox
       - --disable-dev-shm-usage
       - --disable-gpu
       - --window-size=1920,1200
 allowed_domains:
   - rlggyp.com
+replay_protection:
+  nonce_ttl: 30
+  max_nonce_cache_size: 10000
 ```
 
 - `hmac_secret`: Secret key for HMAC-SHA256 signature verification.
 - `basic_auth_users`: Map of usernames to bcrypt-hashed passwords.
 - `screenshot`: Screenshot capture settings.
 - `allowed_domains`: List of allowed domains for screenshot requests (SSRF protection).
+- `replay_protection`: Replay attack prevention settings.
+  - `nonce_ttl`: Time-to-live for nonce in seconds (default: 30).
+  - `max_nonce_cache_size`: Maximum number of nonces stored in cache (default: 10000).
 
 ### Example `log4rs.yaml`
 
@@ -174,10 +180,102 @@ services:
     docker compose up -d
     ```
 
+## Client Authentication
+
+Requests must be authenticated using Basic Auth and HMAC-SHA256 signature verification with replay attack protection.
+
+### Request Headers Required
+- `Authorization`: Basic authentication (base64 encoded `username:password`)
+- `Signature-256`: HMAC-SHA256 signature with format `sha256={hex_encoded_signature}`
+- `Timestamp`: Unix timestamp in seconds (UTC)
+- `Nonce`: Unique identifier (UUID v4 recommended)
+
+### Signature Calculation
+
+The signature is calculated using a canonical message format:
+```
+canonical_message = "{timestamp}\n{nonce}\n{sha256(body)}"
+signature = hex(HMAC-SHA256(secret, canonical_message))
+```
+
+### Python Example
+
+```python
+import requests
+import hmac
+import hashlib
+import json
+import uuid
+from datetime import datetime, timezone
+import base64
+
+# Configuration
+SERVER_URL = "http://localhost:12009"
+HMAC_SECRET = "helloworldrlggyp"
+USERNAME = "rlggyp"
+PASSWORD = "your-password"
+
+def make_authenticated_request(url_to_screenshot):
+    # Prepare request body
+    payload = json.dumps({"url": url_to_screenshot})
+    body_bytes = payload.encode()
+    
+    # Generate nonce and timestamp
+    nonce = str(uuid.uuid4())
+    timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+
+    
+    # Calculate signature
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+    canonical_message = f"{timestamp}\n{nonce}\n{body_hash}"
+    signature = hmac.new(
+        HMAC_SECRET.encode(),
+        canonical_message.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    # Prepare headers
+    auth_string = base64.b64encode(
+        f"{USERNAME}:{PASSWORD}".encode()
+    ).decode()
+    
+    headers = {
+        "Authorization": f"Basic {auth_string}",
+        "Signature-256": f"sha256={signature}",
+        "Timestamp": timestamp,
+        "Nonce": nonce,
+        "Content-Type": "application/json"
+    }
+    
+    # Make request
+    response = requests.post(
+        f"{SERVER_URL}/api/screenshotr",
+        data=body_bytes,
+        headers=headers
+    )
+    
+    return response.json()
+
+# Usage
+try:
+    result = make_authenticated_request("https://rlggyp.com")
+    print(f"Screenshot URL: {result['image_url']}")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### Notes
+- Each request must have a **unique nonce** - reusing a nonce within the TTL will be rejected as a replay attack
+- The **timestamp** must be within the TTL window (default 30 seconds) of server time
+- Request body must match exactly the bytes used in signature calculation
+- All components (timestamp, nonce, body) are protected by the signature
+
 ## Security Notes
 
 - Only domains listed in `allowed_domains` can be used for screenshot requests, preventing SSRF attacks.
 - Use strong secrets and passwords for authentication and HMAC.
+- Replay attack protection prevents the same request from being accepted multiple times.
+- Always use HTTPS in production to prevent credential interception.
 
 ## Limitations
 
