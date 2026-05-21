@@ -37,11 +37,6 @@ impl BasicAuth {
 
 
     pub fn is_valid_basic_auth_header(auth_header: &str) -> Option<Credential> {
-        log::debug!(
-            "Checking if Authorization header is valid Basic Auth: {}",
-            auth_header
-        );
-
         if !(auth_header.starts_with("Basic") && auth_header.len() > 6) {
             log::debug!("Auth header does not start with `Basic` or is too short");
             return None;

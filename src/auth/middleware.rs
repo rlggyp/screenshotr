@@ -73,6 +73,16 @@ pub async fn hmac_middleware(
         .map(|x| x.trim().to_string())
         .unwrap_or_default();
 
+    let timestamp = request.headers()
+        .get("Timestamp")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
+    let nonce = request.headers()
+        .get("Nonce")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+
     let (parts, body) = request.into_parts();
 
     let body = match to_bytes(body, MAX_PAYLOAD_BODY_SIZE).await {
@@ -80,13 +90,24 @@ pub async fn hmac_middleware(
         Err(_) => return Err(StatusCode::UNAUTHORIZED),
     };
 
-    if state.hmac.verify_payload(&body, &signature) {
-        log::error!("[middleware][hmac] Signature valid");
+    let (nonce, timestamp) = match state.replay_protection_validator.validate(
+        timestamp.as_deref(),
+        nonce.as_deref()
+    ).await {
+        Ok((n, ts)) => (n, ts.to_string()),
+        Err(e)  => {
+            log::warn!("[middleware][hmac] Replay protection validation failed: {}", e);
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+    };
+
+    if state.hmac.verify_payload(&body, &timestamp, &nonce, &signature) {
+        log::info!("[middleware][hmac] Signature verified and nonce cached");
 
         let request = Request::from_parts(parts, Body::from(body));
         Ok(next.run(request).await)
     } else {
-        log::error!("[middleware][hmac] Unauthorized, signature isn't valid");
+        log::error!("[middleware][hmac] Unauthorized, signature verification failed");
         Err(StatusCode::UNAUTHORIZED)
     }
 }
