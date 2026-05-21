@@ -47,9 +47,7 @@ impl ScreenshotConfig {
             }
         });
 
-        let mut map = serde_json::Map::new();
-        map.insert("capabilities".into(), capabilities);
-        map
+        capabilities.as_object().cloned().unwrap_or_default()
     }
 
     fn normalize(&mut self) {
@@ -65,7 +63,35 @@ impl ScreenshotConfig {
             .trim_end_matches('/')
             .to_string();
     }
-} 
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ReplayProtectionConfig {
+    #[serde(default = "ReplayProtectionConfig::default_nonce_ttl")]
+    pub nonce_ttl: i64,
+
+    #[serde(default = "ReplayProtectionConfig::default_max_nonce_cache_size")]
+    pub max_nonce_cache_size: usize,
+}
+
+impl ReplayProtectionConfig {
+    fn default_nonce_ttl() -> i64 {
+        60
+    }
+
+    fn default_max_nonce_cache_size() -> usize {
+        1000
+    }
+}
+
+impl Default for ReplayProtectionConfig {
+    fn default() -> Self {
+        Self {
+            nonce_ttl: Self::default_nonce_ttl(),
+            max_nonce_cache_size: Self::default_max_nonce_cache_size(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Config {
@@ -73,6 +99,8 @@ pub struct Config {
     pub basic_auth_users: HashMap<String, String>,
     pub screenshot: ScreenshotConfig,
     pub allowed_domains: Vec<String>,
+    #[serde(default)]
+    pub replay_protection: ReplayProtectionConfig,
 }
 
 impl Config {
