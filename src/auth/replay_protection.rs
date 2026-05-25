@@ -10,7 +10,7 @@ pub struct ReplayProtectionValidator {
 
 impl ReplayProtectionValidator {
     pub fn new(config: ReplayProtectionConfig) -> Self {
-        let nonce_ttl = config.nonce_ttl;
+        let nonce_ttl = config.nonce_ttl_secs;
         let nonce_cache = NonceCache::new(config.max_nonce_cache_size, nonce_ttl);
         
         Self {

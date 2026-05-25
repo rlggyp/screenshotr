@@ -67,15 +67,15 @@ impl ScreenshotConfig {
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct ReplayProtectionConfig {
-    #[serde(default = "ReplayProtectionConfig::default_nonce_ttl")]
-    pub nonce_ttl: i64,
+    #[serde(default = "ReplayProtectionConfig::default_nonce_ttl_secs")]
+    pub nonce_ttl_secs: i64,
 
     #[serde(default = "ReplayProtectionConfig::default_max_nonce_cache_size")]
     pub max_nonce_cache_size: usize,
 }
 
 impl ReplayProtectionConfig {
-    fn default_nonce_ttl() -> i64 {
+    fn default_nonce_ttl_secs() -> i64 {
         60
     }
 
@@ -87,7 +87,7 @@ impl ReplayProtectionConfig {
 impl Default for ReplayProtectionConfig {
     fn default() -> Self {
         Self {
-            nonce_ttl: Self::default_nonce_ttl(),
+            nonce_ttl_secs: Self::default_nonce_ttl_secs(),
             max_nonce_cache_size: Self::default_max_nonce_cache_size(),
         }
     }

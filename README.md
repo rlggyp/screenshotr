@@ -38,7 +38,7 @@
   Returned if the request body is invalid.
   ```json
   {
-    "message": "Invalid request body"
+    "error": "Invalid request body"
   }
   ```
 
@@ -46,7 +46,7 @@
   Returned if the requested URL is not in the allowed domains.
   ```json
   {
-    "message": "URL not allowed"
+    "error": "URL not allowed"
   }
   ```
 
@@ -54,7 +54,7 @@
   Returned if an internal error occurs during screenshot capture.
   ```json
   {
-    "message": "error details"
+    "error": "error details"
   }
   ```
 
@@ -92,8 +92,8 @@ screenshot:
 allowed_domains:
   - rlggyp.com
 replay_protection:
-  nonce_ttl: 30
-  max_nonce_cache_size: 10000
+  nonce_ttl_secs: 60
+  max_nonce_cache_size: 1000
 ```
 
 - `hmac_secret`: Secret key for HMAC-SHA256 signature verification.
@@ -101,8 +101,8 @@ replay_protection:
 - `screenshot`: Screenshot capture settings.
 - `allowed_domains`: List of allowed domains for screenshot requests (SSRF protection).
 - `replay_protection`: Replay attack prevention settings.
-  - `nonce_ttl`: Time-to-live for nonce in seconds (default: 30).
-  - `max_nonce_cache_size`: Maximum number of nonces stored in cache (default: 10000).
+  - `nonce_ttl_secs`: Time-to-live for nonce in seconds (default: 60).
+  - `max_nonce_cache_size`: Maximum number of nonces stored in cache (default: 1000).
 
 ### Example `log4rs.yaml`
 
@@ -266,7 +266,7 @@ except Exception as e:
 
 ### Notes
 - Each request must have a **unique nonce** - reusing a nonce within the TTL will be rejected as a replay attack
-- The **timestamp** must be within the TTL window (default 30 seconds) of server time
+- The **timestamp** must be within the TTL window (default 60 seconds) of server time
 - Request body must match exactly the bytes used in signature calculation
 - All components (timestamp, nonce, body) are protected by the signature
 

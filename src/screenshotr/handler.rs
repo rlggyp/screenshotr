@@ -21,13 +21,19 @@ pub async fn screenshot(
     let payload = match result {
         Err(e) => {
             log::error!("Invalid request body: {e:#?}");
-            return (StatusCode::BAD_REQUEST, "Invalid request body".to_string()).into_response();
+            let response_json = serde_json::json!({
+                "error": "Invalid request body",
+            });
+            return (StatusCode::BAD_REQUEST, Json(response_json)).into_response();
         },
         Ok(payload) => payload,
     };
 
     if !is_allowed_domains(&payload.url, &app_state.allowed_domains) {
-        return (StatusCode::FORBIDDEN, "URL not allowed".to_string()).into_response();
+        let response_json = serde_json::json!({
+            "error": "URL not allowed",
+        });
+        return (StatusCode::FORBIDDEN, Json(response_json)).into_response();
     }
 
     match app_state.screenshot.take_screenshot(&payload.url).await {
@@ -36,18 +42,14 @@ pub async fn screenshot(
                 "image_url": image_url,
             });
 
-            let response = serde_json::to_string(&response_json).unwrap_or_default();
-
-           (StatusCode::OK, response).into_response()
+            (StatusCode::OK, Json(response_json)).into_response()
         },
         Err(e) => {
             let response_json = serde_json::json!({
-                "message": e.to_string(),
+                "error": e.to_string(),
             });
 
-            let response = serde_json::to_string(&response_json).unwrap_or_default();
-
-           (StatusCode::INTERNAL_SERVER_ERROR, response).into_response()
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(response_json)).into_response()
         }
     }
 }

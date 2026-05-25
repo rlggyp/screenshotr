@@ -7,8 +7,10 @@ use axum::{
   http::StatusCode,
   middleware::Next,
   response::{IntoResponse, Response},
-  body::{Body, to_bytes}
+  body::{Body, to_bytes},
+  Json
 };
+use serde_json::json;
 
 const MAX_PAYLOAD_BODY_SIZE: usize = 256 * 1024;
 
@@ -31,11 +33,11 @@ pub async fn basic_auth_middleware(
     
         let Some(auth_header) = auth_header else {
             log::debug!("[middleware][basic_auth] No Authorization header found");
-            return Err(StatusCode::UNAUTHORIZED)
+            return Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Missing Authorization header"}))))
         };
 
         let Some(credential) = BasicAuth::is_valid_basic_auth_header(auth_header) else {
-            return Err(StatusCode::UNAUTHORIZED)
+            return Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Invalid Authorization header format"}))))
         };
 
         {
@@ -56,7 +58,7 @@ pub async fn basic_auth_middleware(
         Ok(next.run(request).await)
     } else {
         log::debug!("[middleware][basic_auth] Authorization failed");
-        Err(StatusCode::UNAUTHORIZED)
+        Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Invalid credentials"}))))
     }
 }
 
@@ -87,7 +89,7 @@ pub async fn hmac_middleware(
 
     let body = match to_bytes(body, MAX_PAYLOAD_BODY_SIZE).await {
         Ok(b) => b,
-        Err(_) => return Err(StatusCode::UNAUTHORIZED),
+        Err(_) => return Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Request body too large"})))),
     };
 
     let (nonce, timestamp) = match state.replay_protection_validator.validate(
@@ -97,7 +99,7 @@ pub async fn hmac_middleware(
         Ok((n, ts)) => (n, ts.to_string()),
         Err(e)  => {
             log::warn!("[middleware][hmac] Replay protection validation failed: {}", e);
-            return Err(StatusCode::UNAUTHORIZED);
+            return Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Invalid request"}))));
         }
     };
 
@@ -108,6 +110,6 @@ pub async fn hmac_middleware(
         Ok(next.run(request).await)
     } else {
         log::error!("[middleware][hmac] Unauthorized, signature verification failed");
-        Err(StatusCode::UNAUTHORIZED)
+        Err((StatusCode::UNAUTHORIZED, Json(json!({"error": "Signature verification failed"}))))
     }
 }
